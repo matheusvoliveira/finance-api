@@ -4,9 +4,22 @@ import prisma from "../../../lib/prisma.js";
 const router = express.Router();
 
 // CREATE
-router.post("/", async (req, res) => {
-  const { title, amount, type, date } = req.body;
+router.post("/", async (req, res, next) => {
   try {
+    const { title, amount, type, date } = req.body;
+
+    if (
+      !title ||
+      title.trim() === "" ||
+      !amount ||
+      !date ||
+      date.trim() === ""
+    ) {
+      const error = new Error("There is an empty field");
+      error.status = 400;
+      throw error;
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         title,
@@ -17,40 +30,56 @@ router.post("/", async (req, res) => {
     });
     res.status(201).json(transaction);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // READ ALL
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const transactions = await prisma.transaction.findMany();
     res.status(200).json(transactions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // READ ONE
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   const { id } = req.params;
   try {
     const transaction = await prisma.transaction.findUnique({
       where: { id: parseInt(id) },
     });
-    if (!transaction)
-      return res.status(404).json({ error: "Transaction not found" });
+    if (!transaction) {
+      const error = new Error("Transaction not found");
+      error.status = 404;
+      throw error;
+    }
     res.status(200).json(transaction);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // UPDATE
-router.put("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { title, amount, type, date } = req.body;
+router.put("/:id", async (req, res, next) => {
   try {
+    const { id } = req.params;
+    const { title, amount, type, date } = req.body;
+
+    if (
+      !title ||
+      title.trim() === "" ||
+      !amount ||
+      !date ||
+      date.trim() === ""
+    ) {
+      const error = new Error("There is an empty field");
+      error.status = 400;
+      throw error;
+    }
+
     const transaction = await prisma.transaction.update({
       where: { id: parseInt(id) },
       data: {
@@ -62,12 +91,12 @@ router.put("/:id", async (req, res) => {
     });
     res.status(200).json(transaction);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req, res, next) => {
   const { id } = req.params;
   try {
     await prisma.transaction.delete({
@@ -75,8 +104,16 @@ router.delete("/:id", async (req, res) => {
     });
     res.status(204).send();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
+});
+
+router.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({
+    error: err.name || "Internal Server Error",
+    message: err.message || "Something went wrong with the server",
+  });
 });
 
 export default router;
