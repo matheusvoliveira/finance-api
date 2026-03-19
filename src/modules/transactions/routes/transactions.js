@@ -20,6 +20,11 @@ router.post("/", async (req, res, next) => {
       throw error;
     }
 
+    if (type !== "income" && type !== "expense") {
+      const error = new Error("Type field must be 'income' or 'expense'");
+      error.status = 400;
+      throw error;
+    }
     const transaction = await prisma.transaction.create({
       data: {
         title,
@@ -37,8 +42,42 @@ router.post("/", async (req, res, next) => {
 // READ ALL
 router.get("/", async (req, res, next) => {
   try {
-    const transactions = await prisma.transaction.findMany();
-    res.status(200).json(transactions);
+    // get query params, default page=1 and limit=10
+    const { startDate, endDate, page = 1, limit = 10 } = req.query;
+
+    // build date filter only if params are provided
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate);
+
+    // calculate how many records to skip
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        date: Object.keys(dateFilter).length ? dateFilter : undefined,
+      },
+      skip,
+      take: parseInt(limit),
+      orderBy: { date: "desc" },
+    });
+
+    // count total records for pagination
+    const total = await prisma.transaction.count({
+      where: {
+        date: Object.keys(dateFilter).length ? dateFilter : undefined,
+      },
+    });
+
+    res.status(200).json({
+      data: transactions,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -80,6 +119,12 @@ router.put("/:id", async (req, res, next) => {
       throw error;
     }
 
+    if (type !== "income" && type !== "expense") {
+      const error = new Error("Type field must be 'income' or 'expense'");
+      error.status = 400;
+      throw error;
+    }
+
     const transaction = await prisma.transaction.update({
       where: { id: parseInt(id) },
       data: {
@@ -106,14 +151,6 @@ router.delete("/:id", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
-
-router.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({
-    error: err.name || "Internal Server Error",
-    message: err.message || "Something went wrong with the server",
-  });
 });
 
 export default router;
