@@ -15,5 +15,7 @@ app.use("/balance", balanceRouter);
 // sends the errors to the middleware
 app.use(errorHandler);
 
-const PORT = 3000;
+export default app;
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
